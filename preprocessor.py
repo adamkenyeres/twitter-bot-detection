@@ -19,7 +19,7 @@ from ekphrasis.classes.segmenter import Segmenter
 import pandas as pd
 import warnings
 from sklearn.preprocessing import StandardScaler
-
+import gc
 warnings.filterwarnings("ignore", category=UserWarning, module='bs4')
 #import spacy
 #nlp = spacy.load("en_core_web_sm")
@@ -247,37 +247,26 @@ class Preprocessor:
     def scale_hidden_states(self, accounts, should_fit=True):
         row_list = []
         names = []
-        lengths = []
+
         for i in range(0, len(accounts[0][0])):
             names.append(f'h_{i}')
             
         for account in accounts:
-            lengths.append(len(account))
             for tweet in account:
-                i = 0
-                dict = {}
-                for state in tweet:
-                    dict[f'h_{i}'] = state
-                    i += 1
-                row_list.append(dict)
-        
-        df = pd.DataFrame(row_list)
-        
+              row_list.append(tweet)
+
         if should_fit:
-            df[names] = self.scaler.fit_transform(df[names])
+            scalled_rows = self.scaler.fit_transform(row_list)
         else:
-            df[names] = self.scaler.transform(df[names])
-            
-        tweets = df.values.tolist()
-        
+            scalled_rows = self.scaler.transform(row_list)
+               
         curr_index = 0
         normalized_accounts = []
         for account in accounts:
             normalized_account = []
             for index in range(curr_index, curr_index + len(account)):
-                normalized_account.append(tweets[index])
+                normalized_account.append(scalled_rows[index])
             curr_index += len(account)
             normalized_accounts.append(normalized_account)
         
-        return df, normalized_accounts
-            
+        return normalized_accounts

@@ -7,7 +7,7 @@ class Evaulator():
     def __init__(self):
         pass
     
-    def evaulate(self, y_pred, y, name):
+    def evaulate(self, y_pred, y_pred_prob, y, name):
         print(f'-----Evaulation of {name}-----')
         acc = accuracy_score(y, y_pred)
         f1 = f1_score(y, y_pred)
@@ -24,7 +24,7 @@ class Evaulator():
         print("Confusion Matrix:")
         print(confusion_matrix(y, y_pred))
         self.plot_confusion_mtx(y_pred, y, name)
-        self.plot_roc_curve(y_pred, y, name)
+        self.plot_roc_curve(y, y_pred_prob, name)
         return f1
     
     def plot_confusion_mtx(self, y, y_pred, name):
@@ -32,11 +32,12 @@ class Evaulator():
         mtx = confusion_matrix(y, y_pred)
         print(mtx[0][0])
         print(mtx)
-        df = pd.DataFrame(mtx, index = ['Negative', 'Positive'],  columns = ['Negative', 'Positive'])        
+        df = pd.DataFrame(mtx, index = ['Human', 'Bot'],  columns = ['Human', 'Bot']) 
         print(df.head())
-        ax = sns.heatmap(df, annot=True)
+        ax = sns.heatmap(df, annot=True,cmap='Blues', fmt='g')
         ax.set(xlabel='Predicted Class', ylabel='Actual Class')
         plt.title(f'Confusion Matrix for {name}')
+        plt.savefig(f'confusion_mtx_{name}.png')
         plt.show()
 
     def plot_roc_curve(self, y, y_pred, name):
@@ -57,7 +58,6 @@ class Evaulator():
         plt.ylabel('True Positive Rate')
         plt.title(f'Receiver operating characteristic for {name}')
         plt.legend(loc="lower right")
+        plt.savefig(f'roc_curve_{name}.png')
         plt.show()
 
-evaulator = Evaulator()
-evaulator.evaulate([1,1,0, 1,0], [1,1,1, 0,1], 'Test')

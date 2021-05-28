@@ -224,16 +224,24 @@ class TweetClassifier(nn.ModuleList):
         return self
 
 class AccountClassifier(nn.ModuleList):
-    def __init__(self, input_size, batch_size, lstm_layers, lr, lstm_hidden_size=20, bidirectional=False):
+    def __init__(self, input_size, batch_size, lstm_layers, lr, weight_decay=0, 
+                 lstm_dropout=0, fc_drouput=0, lstm_hidden_size=20, 
+                 nn_size=128, bidirectional=False, optimize=False, n_eopchs_stop=20):
         super(AccountClassifier, self).__init__()
         
         self.name = 'Account Classifier'
         self.batch_size = batch_size
-        self.LSTM_layers = lstm_layers
-        self.LSTM_hidden_size = lstm_hidden_size
+        self.lstm_layers = lstm_layers
+        self.lstm_hidden_size = lstm_hidden_size
         self.input_size = input_size
         self.bidirectional = bidirectional
         self.lr = lr
+        self.weight_decay = weight_decay
+        self.lstm_dropout = lstm_dropout
+        self.fc_drouput = fc_drouput
+        self.nn_size = nn_size
+        self.optimize = optimize
+        self.n_eopchs_stop = n_eopchs_stop
         self.multiplication = 2 if bidirectional else 1
         
         self.device = torch.device("cpu")
@@ -243,18 +251,19 @@ class AccountClassifier(nn.ModuleList):
             self.to(self.device)
         
         self.lstm = nn.LSTM(input_size=self.input_size,
-                            hidden_size=self.LSTM_hidden_size,
-                            num_layers=self.LSTM_layers,
+                            hidden_size=self.lstm_hidden_size,
+                            num_layers=self.lstm_layers,
                             batch_first=False,
-                            bidirectional=self.bidirectional)
+                            bidirectional=self.bidirectional, 
+                            dropout=self.lstm_dropout)
         
-        self.fc1 = nn.Linear(in_features=self.LSTM_hidden_size*self.multiplication, out_features=128)
-        self.fc2 = nn.Linear(128, 1)
-        self.dropout = nn.Dropout(0.5)
+        self.fc1 = nn.Linear(in_features=self.lstm_hidden_size*self.multiplication, out_features=self.nn_size)
+        self.fc2 = nn.Linear(self.nn_size, 1)
+        self.dropout = nn.Dropout(self.fc_drouput)
 
     def forward(self, x, length):
-        h = torch.zeros((self.LSTM_layers*self.multiplication, 1, self.LSTM_hidden_size)).to(self.device)
-        c = torch.zeros((self.LSTM_layers*self.multiplication, 1, self.LSTM_hidden_size)).to(self.device)
+        h = torch.zeros((self.lstm_layers*self.multiplication, x.size(0), self.lstm_hidden_size)).to(self.device)
+        c = torch.zeros((self.lstm_layers*self.multiplication, x.size(0), self.lstm_hidden_size)).to(self.device)
         
         torch.nn.init.xavier_normal_(h)
         torch.nn.init.xavier_normal_(c)
@@ -289,9 +298,6 @@ class AccountClassifier(nn.ModuleList):
                 x = x.to(self.device)
                 y = y_batch.type(torch.FloatTensor)
                 y = y.to(self.device)
-                
-                #lengths = lengths.type(torch.IntTensor)
-                #lengths = lengths.to(self.device)
     
                 y_pred, _ = self(x, lengths)
                 predictions.extend(np.round(y_pred.cpu().detach().numpy()))
@@ -301,6 +307,10 @@ class AccountClassifier(nn.ModuleList):
                 loss_steps +=1
                 
         return predictions, total_loss/loss_steps
+
+    def send_optimization_result(self, epochs, val_loss, val_acc, train_accuracy, train_loss):
+        if self.optimize:
+            tune.report(iterations=epochs, mean_loss=val_loss, val_acc = val_acc, train_acc = train_accuracy, train_loss = train_loss)
 
     def train_model(self,  x_train, y_train, x_val, x_lengths, y_val, epochs=10):
         print(self)
@@ -316,7 +326,7 @@ class AccountClassifier(nn.ModuleList):
         my_dataset = DatasetMaperList(x_train, y_train, x_lengths)
         loader_training = DataLoader(my_dataset, batch_size=self.batch_size)
         
-        optimizer =  optim.RMSprop(self.parameters(), lr=self.lr) #optim.Adam(classifier.parameters(), lr=LEARNING_RATE) #
+        optimizer =  optim.RMSprop(self.parameters(), lr=self.lr, weight_decay=self.weight_decay) #optim.Adam(classifier.parameters(), lr=LEARNING_RATE) #
         loss_function = F.binary_cross_entropy #nn.BCELoss()
         
         print('Starting to train the model')
@@ -324,6 +334,8 @@ class AccountClassifier(nn.ModuleList):
         train_accuracies = []
         val_losses = []
         val_accuracies = []
+        num_epochs_not_improve = 0
+        min_val_loss = np.Inf
         for epoch in range(epochs):
             print(f'Training epoch {epoch}')
             predictions = []
@@ -336,9 +348,6 @@ class AccountClassifier(nn.ModuleList):
                 x = x.to(self.device)
                 y = y_batch.type(torch.FloatTensor)
                 y = y.to(self.device)
-                
-                #length = length.type(torch.IntTensor)
-                #length = length.to(self.device)
                 
                 y_pred,_ = self(x, length)
                 y_pred = y_pred.reshape(-1)
@@ -368,6 +377,20 @@ class AccountClassifier(nn.ModuleList):
             
             val_accuracies.append(val_acc)
             val_losses.append(val_loss)
+            
+            self.send_optimization_result(epochs, val_loss, val_acc, train_accuracy, train_loss)
+            
+            if val_loss > min_val_loss:
+                num_epochs_not_improve +=1
+                print(f'Possibly early stopping will be neccesary {num_epochs_not_improve}')
+            else:
+                print('Re-setting early stopping')
+                min_val_loss = val_loss
+                num_epochs_not_improve = 0
+                
+            if epoch > 5 and num_epochs_not_improve == self.n_eopchs_stop:
+                print('Early stopping')
+                break;
             
         Model.plot_accuracies(val_accuracies, train_accuracies, self.name)
         Model.plot_losses(val_losses, train_losses, self.name)
