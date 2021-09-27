@@ -1,6 +1,6 @@
 from preprocessor import Preprocessor
 from data_understanding import DataUnderstanding
-from lstm import TweetClassifier, AccountClassifier, CombinedClassifier
+from lstm import TweetClassifier, AccountClassifier
 from optimizer import Optimizer
 from dataset_loader import DatasetMaper, DataSetLoader, DatasetMaperList, DatasetMaperList2
 from torch.utils.data import DataLoader
@@ -24,7 +24,7 @@ from ray import tune
 from tweet_augmenter import TweetAugmenter
 
 RUN_ON_SERVER = False
-LOAD_PREPROCESSED_DATA = False
+LOAD_PREPROCESSED_DATA = True
 LOAD_TRAINED_CLASSIFIER = False
 AUGMENT_TWEETS = True
 if RUN_ON_SERVER:
@@ -167,15 +167,18 @@ else:
     save_preprocessed_data(x_test, y_test, x_train, y_train, x_val, y_val, hashes_val, hashes_test, hashes_train)
 
 #x_train, y_train, x_padded_train, x_tweets_train, y_tweets_train, hashes_train = dataset_loader.get_all_x_y(train_path, embedding, truth='truth-train.txt', shouldSplit=False, should_preprocess=False)
-
+x_train, y_train, x_padded_train, x_tweets_train, y_tweets_train, hashes_train = dataset_loader.get_all_x_y(train_path, embedding, truth='truth-train.txt', shouldSplit=False)
 print('Getting training and test set')
-x_train, y_train, x_padded_train, x_tweets_train, y_tweets_train, hashes_train = dataset_loader.get_all_x_y(train_path, embedding, truth='truth-train.txt', shouldSplit=False, should_preprocess=False)
+x_train, y_train, x_padded_train, x_tweets_train, y_tweets_train, hashes_train = dataset_loader.get_all_x_y(train_path, embedding, truth='truth-train.txt', shouldSplit=False, should_preprocess=True)
 x_test, y_test, x_padded_test, x_tweets_test, y_tweets_test, hashes_test = dataset_loader.get_all_x_y(test_path, embedding, shouldSplit=False, should_preprocess=False)
 x_val, y_val, x_padded_val, x_tweets_val, y_tweets_val, hashes_val = dataset_loader.get_all_x_y(train_path, embedding, truth='truth-dev.txt', shouldSplit=False, should_preprocess=False)
 
+x_train[0][0]
 x_test[0][0]
 write_to_file(x_test, 'x_test_without_prep')
 write_to_file(y_test, 'y_test_without_prep')
+write_to_file(x_val, 'x_val_without_prep')
+write_to_file(y_val, 'y_val_without_prep')
 x_tweets_train, y_tweets_train = get_x_y_tweets(x_train, y_train)
 x_tweets_val, y_tweets_val = get_x_y_tweets(x_val, y_val)
 x_tweets_test, y_tweets_test = get_x_y_tweets(x_test, y_test)
@@ -188,14 +191,32 @@ write_to_file(y_tweets_train, 'y_tweet_train_without_prep')
 write_to_file(y_tweets_val, 'y_tweet_val_without_prep')
 write_to_file(y_tweets_test, 'y_tweet_test_without_prep')
 
-print(x_train[0][0])
+y_train[0]
+bots_train = []
+human_train = []
+for i in range(0, len(x_train)):
+    if i %2 == 0:
+        human_train.extend(x_train[i])
+    else:
+        bots_train.extend(x_train[i])
+
+bots_train[100]
+human_train[100]
+
+bots_y = len(bots_train)*[1]
+human_y = len(human_train)*[0]
+
+bots_y
+print(x_val[100][0])
 x_tweets, y_tweets = dataset_loader.get_x_y_tweets(x_train, y_train)
-x_tweets[0]
+x_tweets_train[0]
+y_tweets[0]
 data_understander = DataUnderstanding()
 data_understander.plot_tweet_token_distribution(x_train)
 data_understander.plot_target_distribution(x_tweets_train, y_tweets_train)
-data_understander.plot_most_frequent_tokens(x_tweets, y_tweets)
-data_understander.plot_special_char_distribution(x_tweets_train, y_tweets_train)
+data_understander.plot_most_frequent_tokens(bots_train, bots_y, 'Most Frequently used tokens by Bots')
+data_understander.plot_most_frequent_tokens(human_train, human_y, 'Most Frequently used tokens by Humans')
+data_understander.plot_special_char_distribution(x_tweets, y_tweets)
 data_understander.tweet_contains_emoji(':)')
 
 print(x_tweets_train[1000])

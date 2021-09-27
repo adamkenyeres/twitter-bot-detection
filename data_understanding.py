@@ -25,16 +25,16 @@ class DataUnderstanding:
         plt.savefig('target_distribution.png')
         plt.show()
 
-    def plot_most_frequent_tokens(self, x, y):
+    def plot_most_frequent_tokens(self, x, y, label):
         d = {'Tweets': x, 'Label':y}
         df = pd.DataFrame(data=d)
         count_vectorizer = CountVectorizer()
         tf_original = count_vectorizer.fit_transform(df['Tweets'])
         tf_feature_names = count_vectorizer.get_feature_names()
-        visualizer = FreqDistVisualizer(features=tf_feature_names, orient='v')
+        visualizer = FreqDistVisualizer(features=tf_feature_names, orient='v', title=label)
         visualizer.fit(tf_original)
         print(tf_feature_names[:10])
-        visualizer.show(outpath='token_distribution.png')
+        visualizer.show(outpath=label+'.svg')
 
     def plot_distribution(self, d, x_label='Number', y_label='Size', title='Distribution'):
         sns.displot(data=d, kde=True)
@@ -42,6 +42,7 @@ class DataUnderstanding:
         plt.xlabel(x_label)
         plt.ylabel(y_label)
         plt.savefig(title+'.png')
+        plt.savefig(title + '.svg', bbox_inches='tight')
         plt.show()
         
     def plot_box_plot(self, d, title='Distribution'):
@@ -106,24 +107,24 @@ class DataUnderstanding:
         bot_values = []
         bar_width = 0.35
         
-        human_values.append(humans_mentions)
-        human_values.append(humans_rt)
-        human_values.append(humans_hashtags)
-        human_values.append(humans_urls)
-        human_values.append(humans_emoji)
+        human_values.append(100*humans_mentions/(humans_mentions+bots_mentions))
+        human_values.append(100*humans_rt/(humans_rt+bots_rt))
+        human_values.append(100*humans_hashtags/(humans_hashtags+bots_hashtags))
+        human_values.append(100*humans_urls/(humans_urls + bots_url))
+        human_values.append(100*humans_emoji/(humans_emoji + bots_emoji))
         index = np.arange(len(human_values))
 
-        bot_values.append(bots_mentions)
-        bot_values.append(bots_rt)
-        bot_values.append(bots_hashtags)
-        bot_values.append(bots_url)
-        bot_values.append(bots_emoji)
+        bot_values.append(100*bots_mentions//(humans_mentions+bots_mentions))
+        bot_values.append(100*bots_rt/(humans_rt+bots_rt))
+        bot_values.append(100*bots_hashtags/(humans_hashtags+bots_hashtags))
+        bot_values.append(100*bots_url/(humans_urls + bots_url))
+        bot_values.append(100*bots_emoji/(humans_emoji + bots_emoji))
         
         plt.bar(index, human_values, bar_width, label='Humans')
         plt.bar(index + bar_width, bot_values, bar_width, label='Bots')
         plt.xticks(index + bar_width/2, ('Mentions', 'RT', 'Hashtags', 'URls', 'Emojis'))
-        plt.xlabel('Accounts')
-        plt.ylabel('Size')
+        plt.xlabel('Symbols')
+        plt.ylabel('%')
         plt.title('Types of Tweets')
         plt.legend()
         plt.savefig('special_char_dist.png')

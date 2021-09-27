@@ -288,6 +288,7 @@ class AccountClassifier(nn.ModuleList):
         my_dataset = DatasetMaperList(x, y, lengths)
         loader_test = DataLoader(my_dataset)
         
+        probabilities = []
         predictions = []
         total_loss = 0.0
         loss_steps = 0
@@ -301,12 +302,13 @@ class AccountClassifier(nn.ModuleList):
     
                 y_pred, _ = self(x, lengths)
                 predictions.extend(np.round(y_pred.cpu().detach().numpy()))
+                probabilities.extend(y_pred.cpu().detach().numpy())
                 
                 loss = loss_function(y_pred.reshape(-1), y)
                 total_loss += loss.cpu().numpy()
                 loss_steps +=1
                 
-        return predictions, total_loss/loss_steps
+        return predictions, total_loss/loss_steps, probabilities
 
     def send_optimization_result(self, epochs, val_loss, val_acc, train_accuracy, train_loss):
         if self.optimize:
@@ -367,7 +369,7 @@ class AccountClassifier(nn.ModuleList):
             train_loss = train_loss/train_steps
             train_accuracy = accuracy_score(y_train, predictions)  
             
-            val_pred, val_loss = self.get_prediction(x_val, y_val, loss_function)
+            val_pred, val_loss, _ = self.get_prediction(x_val, y_val, loss_function)
             val_acc = accuracy_score(y_val, val_pred)
             
             print(f'Epoch: {epoch} Training loss: {train_loss} Training Accuracy {train_accuracy} Validation Accuracy: {val_acc}, Validation loss: {val_loss}')
